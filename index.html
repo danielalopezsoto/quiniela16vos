@@ -394,6 +394,9 @@
           <option value="done">Finalizados</option>
           <option value="upcoming">Próximos</option>
         </select>
+        <select id="teamFilter">
+          <option value="">Todos los equipos</option>
+        </select>
         <button class="clear-filter" id="clearFilter">Quitar filtro</button>
       </div>
       <div class="matches-grid" id="matchesEl"></div>
@@ -444,6 +447,7 @@ const REFRESH_MS = 3 * 60 * 1000; // auto refresh every 3 minutes
 let RESULTS = {...FALLBACK_RESULTS};
 let activeParticipant = "";
 let activeStatus = "";
+let activeTeam = "";
 
 /* ====================== HELPERS ====================== */
 function initials(name){
@@ -576,9 +580,12 @@ function renderMatches(){
   el.innerHTML = "";
   const today = todayStr();
   const visibleMatches = MATCHES.filter(m=>{
-    if(!activeStatus) return true;
-    const isDone = !!RESULTS[m.num];
-    return activeStatus === 'done' ? isDone : !isDone;
+    if(activeStatus){
+      const isDone = !!RESULTS[m.num];
+      if(activeStatus === 'done' ? !isDone : isDone) return false;
+    }
+    if(activeTeam && m.team1 !== activeTeam && m.team2 !== activeTeam) return false;
+    return true;
   });
 
   if(!visibleMatches.length){
@@ -644,6 +651,11 @@ document.getElementById('statusFilter').addEventListener('change', (e)=>{
   renderMatches();
 });
 
+document.getElementById('teamFilter').addEventListener('change', (e)=>{
+  activeTeam = e.target.value;
+  renderMatches();
+});
+
 function populateSelect(){
   const sel = document.getElementById('searchInput');
   PARTICIPANTS.forEach(name=>{
@@ -654,17 +666,36 @@ function populateSelect(){
   });
 }
 
+function populateTeamFilter(){
+  const sel = document.getElementById('teamFilter');
+  const teams = new Map(); // nombre -> bandera
+  MATCHES.forEach(m=>{
+    teams.set(m.team1, m.flag1);
+    teams.set(m.team2, m.flag2);
+  });
+  const sorted = [...teams.entries()].sort((a,b)=> a[0].localeCompare(b[0]));
+  sorted.forEach(([name, flag])=>{
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = `${flag} ${name}`;
+    sel.appendChild(opt);
+  });
+}
+
 document.getElementById('clearFilter').addEventListener('click', ()=>{
   activeParticipant = "";
   activeStatus = "";
+  activeTeam = "";
   document.getElementById('searchInput').value = "";
   document.getElementById('statusFilter').value = "";
+  document.getElementById('teamFilter').value = "";
   document.body.setAttribute('data-active', "");
   renderAll();
 });
 
 /* ====================== INIT ====================== */
 populateSelect();
+populateTeamFilter();
 renderAll();
 fetchLiveResults();
 setInterval(fetchLiveResults, REFRESH_MS);
